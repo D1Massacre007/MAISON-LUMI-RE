@@ -598,7 +598,7 @@ let panelOpen  = false;
 let isThinking = false;
 
 // Database API Configuration
-const API_URL = 'http://localhost:3001/api';
+const API_URL = 'https://maison-lumi-re.onrender.com';
 let sessionId = localStorage.getItem('chat_session_id') || 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 localStorage.setItem('chat_session_id', sessionId);
 
