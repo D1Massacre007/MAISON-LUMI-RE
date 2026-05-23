@@ -581,7 +581,7 @@ footer { padding:80px 64px 40px; background:var(--ink); border-top:1px solid rgb
 gsap.registerPlugin(ScrollTrigger);
 
 /* ═══════════════════════════════════════
-   CHAT WIDGET - FIXED API VERSION
+   CHAT WIDGET - DATABASE INTEGRATED VERSION
 ═══════════════════════════════════════ */
 
 const chatToggle = document.getElementById('chatToggle');
@@ -594,25 +594,20 @@ const chatChips  = document.getElementById('chatChips');
 const chatBadge  = document.getElementById('chatBadge');
 
 let conversationHistory = [];
-let panelOpen = false;
+let panelOpen  = false;
 let isThinking = false;
 
-/* IMPORTANT: your backend URL */
+// Database API Configuration
 const API_URL = 'https://maison-lumi-re.onrender.com';
-
-let sessionId =
-  localStorage.getItem('chat_session_id') ||
-  'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-
+let sessionId = localStorage.getItem('chat_session_id') || 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 localStorage.setItem('chat_session_id', sessionId);
 
-/* ── UI ── */
+/* ── Toggle ── */
 chatToggle.addEventListener('click', () => {
   panelOpen = !panelOpen;
   chatToggle.classList.toggle('open', panelOpen);
   chatPanel.classList.toggle('open', panelOpen);
   chatBadge.classList.remove('show');
-
   if (panelOpen) {
     chatInput.focus();
     scrollToBottom();
@@ -620,99 +615,82 @@ chatToggle.addEventListener('click', () => {
   }
 });
 
-setTimeout(() => {
-  if (!panelOpen) chatBadge.classList.add('show');
-}, 3000);
+setTimeout(() => { if (!panelOpen) chatBadge.classList.add('show'); }, 3000);
 
 function greet() {
-  appendMsg(
-    'bot',
-    'Bonjour, welcome to Maison Lumière. How may I assist you today?'
-  );
+  appendMsg('bot', 'Bonjour, and welcome to Maison Lumière. I am your personal Lumière Concierge — here to assist you with our collections, availability, and anything else you need. How may I serve you today?');
 }
 
-/* ── Messages ── */
 function appendMsg(role, text) {
   const div = document.createElement('div');
   div.className = 'msg ' + role;
-
-  div.innerHTML =
-    role === 'bot'
-      ? `<div class="msg-bubble">${escHtml(text).replace(/\n/g, '<br>')}</div>`
-      : `<div class="msg-bubble">${escHtml(text).replace(/\n/g, '<br>')}</div>`;
-
+  const botIcon = `<div class="msg-icon"><svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 015 5 5 5 0 01-5 5 5 5 0 01-5-5 5 5 0 015-5m0 12c5.33 0 8 2.67 8 4v2H4v-2c0-1.33 2.67-4 8-4z"/></svg></div>`;
+  div.innerHTML = role === 'bot'
+    ? `${botIcon}<div class="msg-bubble">${escHtml(text).replace(/\n/g,'<br>')}</div>`
+    : `<div class="msg-bubble">${escHtml(text).replace(/\n/g,'<br>')}</div>`;
   chatMsgs.appendChild(div);
   scrollToBottom();
 }
 
-function escHtml(s = '') {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-/* ── typing ── */
 let typingEl = null;
-
 function showTyping() {
   typingEl = document.createElement('div');
   typingEl.className = 'msg bot';
-  typingEl.innerHTML = `<div class="msg-bubble">Thinking...</div>`;
+  typingEl.innerHTML = `
+    <div class="msg-icon"><svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 015 5 5 5 0 01-5 5 5 5 0 01-5-5 5 5 0 015-5m0 12c5.33 0 8 2.67 8 4v2H4v-2c0-1.33 2.67-4 8-4z"/></svg></div>
+    <div class="msg-bubble" style="padding:14px 18px"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
   chatMsgs.appendChild(typingEl);
   scrollToBottom();
 }
+function hideTyping() { if (typingEl) { typingEl.remove(); typingEl = null; } }
+function scrollToBottom() { chatMsgs.scrollTop = chatMsgs.scrollHeight; }
 
-function hideTyping() {
-  if (typingEl) typingEl.remove();
-  typingEl = null;
-}
-
-function scrollToBottom() {
-  chatMsgs.scrollTop = chatMsgs.scrollHeight;
-}
-
-/* ── FIXED API CALL ── */
+/* ── MAIN AI FUNCTION - Uses Database API ── */
 async function getBotReply(userText, history) {
-  console.log('📡 Sending:', userText);
-
-  try {
-    const res = await fetch(`${API_URL}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: userText,
-        sessionId: sessionId
-      })
-    });
-
-    const data = await res.json();
-    console.log('📦 Response:', data);
-
-    if (!res.ok) {
-      throw new Error(data.error || 'Server error');
+    console.log('📡 Sending to database API:', userText);
+    
+    try {
+        const response = await fetch(`${API_URL}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: userText,
+                history: history || [],
+                sessionId: sessionId,
+                customerEmail: null
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Database API response received');
+        
+        if (data.success) {
+            return data.response;
+        } else {
+            throw new Error(data.error);
+        }
+    } catch (error) {
+        console.error('❌ Database API error:', error);
+        return "Pardon, I'm having trouble connecting to the database. Please make sure your server is running on port 3001.";
     }
-
-    if (!data.success) {
-      throw new Error(data.response || 'Failed response');
-    }
-
-    return data.response;
-  } catch (err) {
-    console.error('❌ API ERROR:', err);
-
-    return "I'm having trouble reaching the server right now. Please check backend connection.";
-  }
 }
 
-/* ── SEND MESSAGE ── */
+/* ── Send Message Handler ── */
 async function sendMessage(text) {
   text = text.trim();
   if (!text || isThinking) return;
 
   appendMsg('user', text);
   chatInput.value = '';
-
+  chatInput.style.height = 'auto';
   setThinking(true);
   showTyping();
 
@@ -720,17 +698,13 @@ async function sendMessage(text) {
 
   try {
     const reply = await getBotReply(text, conversationHistory);
-
     hideTyping();
     conversationHistory.push({ role: 'assistant', content: reply });
-
     appendMsg('bot', reply);
   } catch (err) {
     hideTyping();
-    appendMsg(
-      'bot',
-      'Something went wrong. Please try again shortly.'
-    );
+    appendMsg('bot', 'Forgive me — I encountered a difficulty. Please try again in a moment.');
+    console.error('[Concierge]', err);
   }
 
   setThinking(false);
@@ -741,29 +715,98 @@ function setThinking(v) {
   chatSend.disabled = v;
 }
 
-/* ── EVENTS ── */
-chatSend.addEventListener('click', () =>
-  sendMessage(chatInput.value)
-);
-
+/* ── Event listeners ── */
+chatSend.addEventListener('click', () => sendMessage(chatInput.value));
 chatInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage(chatInput.value);
-  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(chatInput.value); }
 });
-
+chatInput.addEventListener('input', () => {
+  chatInput.style.height = 'auto';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 100) + 'px';
+});
+chatChips.addEventListener('click', e => {
+  const chip = e.target.closest('.chip');
+  if (chip) sendMessage(chip.dataset.msg);
+});
 chatClear.addEventListener('click', () => {
   conversationHistory = [];
   chatMsgs.innerHTML = '';
   greet();
 });
 
-function checkHealth() {
-  fetch(`${API_URL}/api/health`)
-    .then(r => r.json())
-    .then(d => console.log('Health:', d))
-    .catch(err => console.log('Backend unreachable:', err));
+// Newsletter form integration with database
+document.addEventListener('DOMContentLoaded', function() {
+    const subscribeBtn = document.querySelector('.f-submit');
+    if (subscribeBtn) {
+        const newBtn = subscribeBtn.cloneNode(true);
+        subscribeBtn.parentNode.replaceChild(newBtn, subscribeBtn);
+        
+        newBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            const inputs = document.querySelectorAll('.f-input');
+            const firstName = inputs[0]?.value || '';
+            const lastName = inputs[1]?.value || '';
+            const email = inputs[2]?.value || '';
+            
+            if (!email) {
+                alert('Please enter your email address');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/newsletter`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ firstName, lastName, email })
+                });
+                const data = await response.json();
+                alert(data.message || 'Merci! You are now part of the inner circle.');
+                if (data.success) {
+                    inputs.forEach(input => input.value = '');
+                }
+            } catch (error) {
+                alert('Subscription successful! Your preferences have been saved.');
+                inputs.forEach(input => input.value = '');
+            }
+        });
+    }
+});
+
+// Health check and product loader
+async function checkHealth() {
+    try {
+        const response = await fetch(`${API_URL}/health`);
+        const data = await response.json();
+        if (data.success) {
+            console.log('✅ Connected to database-backed concierge');
+            loadProductsFromDB();
+        } else {
+            console.log('⚠️ Server running in fallback mode');
+        }
+    } catch (error) {
+        console.log('⚠️ Server offline - make sure to run "npm start"');
+    }
+}
+
+async function loadProductsFromDB() {
+    try {
+        const response = await fetch(`${API_URL}/products`);
+        const data = await response.json();
+        if (data.success && data.products && data.products.length > 0) {
+            const cards = document.querySelectorAll('.card');
+            data.products.forEach((product, index) => {
+                if (cards[index]) {
+                    const nameEl = cards[index].querySelector('.card-name');
+                    const priceEl = cards[index].querySelector('.card-price strong');
+                    if (nameEl) nameEl.textContent = product.name;
+                    if (priceEl && product.price) priceEl.textContent = `€ ${product.price.toLocaleString()}`;
+                }
+            });
+            console.log('✅ Products loaded from database');
+        }
+    } catch (error) {
+        console.log('Using static product data');
+    }
 }
 
 checkHealth();
