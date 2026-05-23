@@ -11,6 +11,16 @@ app.use(express.json());
 app.use(express.static(__dirname));
 
 /* =========================
+   ROOT ROUTE (FIXED)
+========================= */
+app.get("/", (_req, res) => {
+    res.json({
+        status: "ok",
+        message: "Maison Lumière API is running"
+    });
+});
+
+/* =========================
    DB
 ========================= */
 
@@ -38,7 +48,7 @@ const ai = new GoogleGenAI({
 });
 
 /* =========================
-   CLEAN OUTPUT (100% NO ***)
+   CLEAN OUTPUT
 ========================= */
 
 function cleanText(text = "") {
@@ -54,7 +64,7 @@ function cleanText(text = "") {
 }
 
 /* =========================
-   CACHE (IMPORTANT FOR QUOTA)
+   CACHE
 ========================= */
 
 let cachedCtx = null;
@@ -111,55 +121,25 @@ function isSimpleQuery(message) {
 }
 
 /* =========================
-   SYSTEM PROMPT (FIXED FLOW MEMORY)
+   SYSTEM PROMPT
 ========================= */
 
 function systemPrompt(ctx) {
     return `
 You are Maison Lumière AI luxury assistant.
 
-========================
 CRITICAL RULES
-========================
-- NEVER use markdown (*, **, _, #, \`)
-- ALWAYS respond in plain text only
-- NEVER restart conversation
-- ALWAYS continue from previous answer
-- NEVER ask generic questions after recommendation
+- NEVER use markdown symbols
+- ALWAYS respond in plain text
+- KEEP responses concise
 
-========================
-CONVERSATION FLOW RULES
-========================
-
-If user asks "suggest me":
-- Pick ONE product only
-- Explain why briefly
-- THEN ask ONE follow-up question (color, price, order)
-
-If user asks "price":
-- Only give price
-
-If user asks "colors":
-- Only give colors
-
-If user asks "how to order":
-- Give step-by-step order process:
-  1. Add to cart
-  2. Checkout
-  3. Payment
-  4. Shipping
-
-NEVER redirect to advisor unless product does not exist.
-
-========================
 PRODUCT DATA
-========================
 ${JSON.stringify(ctx.products)}
 `;
 }
 
 /* =========================
-   MEMORY (LIMIT TOKENS)
+   MEMORY
 ========================= */
 
 async function getConversation(sessionId) {
@@ -194,7 +174,7 @@ async function loadHistory(sessionId) {
          WHERE conversation_id = ?
          ORDER BY id DESC
          LIMIT 8`,
-        [cid]
+        [sessionId]
     );
 }
 
@@ -206,7 +186,7 @@ function formatHistory(rows) {
 }
 
 /* =========================
-   GEMINI CALL (OPTIMIZED)
+   GEMINI CALL
 ========================= */
 
 async function askGemini(message, sessionId, ctx) {
